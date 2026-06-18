@@ -175,7 +175,7 @@
     <span class="privacy"><span class="dot"></span>обработка целиком в браузере</span>
     <p><b>Когда это работает.</b> Инструмент рассчитан на PDF/A-3, которые уже структурно совместимы с PDF/A-1 — как документы из 1С: без вложений, прозрачности и object/xref-стримов. Такие файлы отличаются от 1A по сути только меткой.</p>
     <p><b>Когда отказывает.</b> Если внутри есть вложенный файл (УПД/счёт-фактура с XML), object-стримы или прозрачность — простой перелейбл дал бы невалидный PDF/A-1. В этих случаях нужна настоящая пересборка (Ghostscript / qpdf), и инструмент честно остановится.</p>
-    <p><b>Проверка.</b> Перед сдачей в архив прогони результат бесплатным валидатором <a href="https://verapdf.org/" target="_blank" rel="noopener">veraPDF</a> (<span style="font-family:var(--mono)">verapdf --flavour 1a файл.pdf</span>).</p>
+    <p><b>Проверка.</b> Перед сдачей в архив проверь соответствие PDF/A. Сайт <span style="font-family:var(--mono)">verapdf.org</span> в РФ недоступен, но есть рабочие варианты: бесплатный <a href="https://github.com/veraPDF/veraPDF-apps/releases" target="_blank" rel="noopener">veraPDF</a> качается с GitHub и работает офлайн (<span style="font-family:var(--mono)">verapdf --flavour 1a файл.pdf</span>), либо <b>Adobe Acrobat Pro</b> → Preflight (Стандарты PDF) → «Проверить соответствие PDF/A».</p>
   </div>
 
   <footer class="colophon">

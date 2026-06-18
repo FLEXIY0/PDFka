@@ -68,12 +68,18 @@ python tools/pdfa_downgrade.py входной.pdf [выходной.pdf]
 
 ## Проверка результата
 
-Перед сдачей в архив прогони файл бесплатным валидатором
-[veraPDF](https://verapdf.org/):
+Перед сдачей в архив проверь соответствие PDF/A. Сайт `verapdf.org` в России
+недоступен, поэтому подойдут такие варианты:
 
-```bash
-verapdf --flavour 1b файл.pdf
-```
+- **veraPDF (офлайн)** — сам валидатор работает без сайта, качается с
+  [GitHub Releases](https://github.com/veraPDF/veraPDF-apps/releases):
+
+  ```bash
+  verapdf --flavour 1b файл.pdf
+  ```
+
+- **Adobe Acrobat Pro** — *Инструменты → Стандарты PDF (Preflight) →
+  «Проверить соответствие PDF/A»*. Доступен в РФ, удобен без консоли.
 
 ---
 
