@@ -40,6 +40,7 @@
 
   /* dropzone */
   .drop{
+    display:block;
     padding:34px 24px;text-align:center;cursor:pointer;
     border-style:dashed;transition:border-color .15s,background .15s;
   }
@@ -60,6 +61,19 @@
   .row .v{font-family:var(--mono);font-size:13px;display:flex;align-items:center;gap:8px}
   .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
   .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.err{background:var(--err)}
+
+  /* heavy-tool offer */
+  .tool{display:none;margin-top:14px}
+  .tool.show{display:block}
+  .tool a{
+    font-family:var(--disp);font-weight:600;font-size:14px;text-decoration:none;
+    color:var(--ink);background:var(--surface);border:1px solid var(--line);
+    border-radius:10px;padding:11px 18px;display:inline-flex;align-items:center;gap:8px;
+    transition:border-color .15s,color .15s;
+  }
+  .tool a:hover{border-color:var(--accent);color:var(--accent)}
+  .tool .hint{font-size:12.5px;color:var(--muted);margin:9px 0 0;font-family:var(--sans)}
+  .tool .hint code{font-family:var(--mono);font-size:12px}
 
   /* verdict */
   .verdict{margin-top:18px;padding:16px 20px;border-radius:12px;font-size:14.5px;display:none;border:1px solid transparent}
@@ -124,6 +138,11 @@
 
   <div class="verdict" id="verdict"></div>
 
+  <div class="tool" id="tool">
+    <a href="tools/convert.bat" download>↓ Скачать конвертер для сложных случаев (.bat)</a>
+    <p class="hint">Запусти <code>convert.bat</code> — он сам поставит Python и зависимости, затем перетащи в окно PDF. Для прозрачности дополнительно нужен <a href="https://ghostscript.com/releases/gsdnld.html" target="_blank" rel="noopener">Ghostscript</a>.</p>
+  </div>
+
   <div class="card diff" id="diff">
     <div class="dh">что меняется — побайтово</div>
     <div class="line"><span class="tag">header</span><span class="old">%PDF-1.<span id="ov">7</span></span><span>→</span><span class="new">%PDF-1.<span class="ch" id="nv">4</span></span></div>
@@ -146,7 +165,7 @@
 <script>
 const $=s=>document.querySelector(s);
 const drop=$('#drop'),fileInput=$('#file'),panel=$('#panel'),rows=$('#rows'),
-      verdict=$('#verdict'),diff=$('#diff'),go=$('#go'),dl=$('#dl'),fname=$('#fname');
+      verdict=$('#verdict'),diff=$('#diff'),go=$('#go'),dl=$('#dl'),fname=$('#fname'),tool=$('#tool');
 let state=null; // {bytes, latin, info, name}
 
 // ---- helpers ----
@@ -204,6 +223,7 @@ drop.addEventListener('drop',e=>{if(e.dataTransfer.files[0]) handle(e.dataTransf
 // ---- render inspection + verdict ----
 function render(name,info){
   fname.textContent=name;
+  tool.classList.remove('show');
   let html='';
   if(!info.isPdf){
     html=row('файл','не PDF','err');
@@ -222,21 +242,26 @@ function render(name,info){
 }
 
 function decide(info){
-  diff.classList.remove('show');dl.classList.remove('show');go.disabled=true;
+  diff.classList.remove('show');dl.classList.remove('show');tool.classList.remove('show');go.disabled=true;
   if(!info.part){
-    setVerdict('err','<b>Это не PDF/A.</b> Перелейбл бесполезен — здесь нет метки <span style="font-family:var(--mono)">pdfaid</span>, которую можно поправить. Нужна полноценная конвертация (Ghostscript).');return;
+    offerTool();
+    setVerdict('err','<b>Это не PDF/A.</b> Перелейбл бесполезен — здесь нет метки <span style="font-family:var(--mono)">pdfaid</span>, которую можно поправить. Нужна полноценная конвертация — её сделает скрипт ниже.');return;
   }
   if(info.conformance==='U'){
+    offerTool();
     setVerdict('err','<b>Уровень U не существует в PDF/A-1.</b> Файл можно понизить только до 1B через пересборку, простой перелейбл не подойдёт.');return;
   }
   if(info.objStm||info.xrefStm){
-    setVerdict('err','<b>Внутри object/xref-стримы.</b> PDF/A-1 их запрещает, и байтовый патч это не исправит. Нужен <span style="font-family:var(--mono)">qpdf --object-streams=disable</span> или Ghostscript.');return;
+    offerTool();
+    setVerdict('err','<b>Внутри object/xref-стримы.</b> PDF/A-1 их запрещает, и байтовый патч это не исправит. Это умеет скрипт ниже (<span style="font-family:var(--mono)">qpdf --object-streams=disable</span> под капотом).');return;
   }
   if(info.embedded){
-    setVerdict('err','<b>Есть вложенные файлы.</b> В PDF/A-1 вложения запрещены, а их удаление = потеря данных. Делать это осознанно — питон-скриптом, не здесь.');return;
+    offerTool();
+    setVerdict('err','<b>Есть вложенные файлы.</b> В PDF/A-1 вложения запрещены, а их удаление = потеря данных. Скрипт ниже удалит их осознанно и пометит файл как 1B.');return;
   }
   if(info.transparency){
-    setVerdict('err','<b>Есть прозрачность.</b> PDF/A-1 (PDF 1.4) её не допускает — нужен рендер/флаттенинг через Ghostscript.');return;
+    offerTool();
+    setVerdict('err','<b>Есть прозрачность.</b> PDF/A-1 (PDF 1.4) её не допускает — нужен флаттенинг. Скрипт ниже сделает это через Ghostscript.');return;
   }
   if(info.part==='1' && info.version==='1.4'){
     setVerdict('ok','<b>Уже PDF/A-1.</b> Делать нечего.');return;
@@ -255,6 +280,7 @@ function decide(info){
   }
 }
 function setVerdict(type,msg){verdict.className='verdict show '+type;verdict.innerHTML=msg;}
+function offerTool(){tool.classList.add('show');}
 
 // ---- convert ----
 go.addEventListener('click',()=>{
