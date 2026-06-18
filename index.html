@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF/A 3A → 1A — перелейбл без пересборки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#E7EBEC; --surface:#FFFFFF; --surface-2:#F4F6F6;
+    --ink:#14191B; --muted:#5C666B; --line:#D2D9DB; --line-soft:#E3E8E9;
+    --accent:#B0431C;        /* changed byte */
+    --ok:#0F716B; --ok-bg:#E2F0EE;
+    --warn:#8A5A00; --warn-bg:#F6EEDB;
+    --err:#9A2B22; --err-bg:#F4E2E0;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --disp:'Space Grotesk',system-ui,sans-serif;
+    --sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+    padding:clamp(20px,5vw,72px) 18px 64px;
+  }
+  .wrap{max-width:680px;margin:0 auto}
+
+  /* header */
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+  h1{font-family:var(--disp);font-weight:700;font-size:clamp(30px,6.5vw,46px);line-height:1.02;letter-spacing:-.02em;margin:0 0 16px}
+  h1 .arrow{color:var(--accent)}
+  .lead{font-size:16px;color:var(--muted);margin:0 0 30px;max-width:52ch}
+  .lead b{color:var(--ink);font-weight:500}
+
+  /* card */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+
+  /* dropzone */
+  .drop{
+    padding:34px 24px;text-align:center;cursor:pointer;
+    border-style:dashed;transition:border-color .15s,background .15s;
+  }
+  .drop:hover,.drop:focus-visible{border-color:var(--accent);background:var(--surface-2);outline:none}
+  .drop.over{border-color:var(--accent);background:var(--surface-2)}
+  .drop .ico{font-family:var(--mono);font-size:13px;color:var(--muted);letter-spacing:.1em}
+  .drop .big{font-family:var(--disp);font-weight:500;font-size:18px;margin:10px 0 4px}
+  .drop .sub{font-size:13.5px;color:var(--muted)}
+  input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+  /* inspection */
+  .panel{margin-top:18px;padding:0;overflow:hidden;display:none}
+  .panel.show{display:block}
+  .panel h2{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0;padding:16px 20px 12px;border-bottom:1px solid var(--line-soft)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 20px;border-bottom:1px solid var(--line-soft);font-size:14px}
+  .row:last-child{border-bottom:0}
+  .row .k{color:var(--muted)}
+  .row .v{font-family:var(--mono);font-size:13px;display:flex;align-items:center;gap:8px}
+  .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+  .dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.err{background:var(--err)}
+
+  /* verdict */
+  .verdict{margin-top:18px;padding:16px 20px;border-radius:12px;font-size:14.5px;display:none;border:1px solid transparent}
+  .verdict.show{display:block}
+  .verdict.ok{background:var(--ok-bg);border-color:#BFE0DC;color:#0a4a46}
+  .verdict.warn{background:var(--warn-bg);border-color:#E8D5A6;color:#5e3e00}
+  .verdict.err{background:var(--err-bg);border-color:#E4C4C0;color:#6e1f18}
+  .verdict b{font-weight:700}
+
+  /* diff signature */
+  .diff{margin-top:18px;padding:20px;font-family:var(--mono);font-size:clamp(13px,3.4vw,15px);display:none}
+  .diff.show{display:block}
+  .diff .dh{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+  .diff .line{display:flex;align-items:baseline;gap:10px;padding:5px 0;white-space:nowrap;overflow-x:auto}
+  .diff .tag{color:var(--muted);flex:0 0 64px}
+  .old{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--accent);opacity:.65}
+  .new{color:var(--accent);font-weight:700}
+  .ch{display:inline-block;transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+
+  /* actions */
+  .actions{margin-top:22px;display:flex;gap:12px;flex-wrap:wrap}
+  button.go{
+    font-family:var(--disp);font-weight:600;font-size:15px;color:#fff;background:var(--ink);
+    border:0;border-radius:10px;padding:13px 22px;cursor:pointer;transition:transform .1s,opacity .15s;
+  }
+  button.go:hover{transform:translateY(-1px)}
+  button.go:disabled{opacity:.35;cursor:not-allowed;transform:none}
+  a.dl{
+    font-family:var(--disp);font-weight:600;font-size:15px;text-decoration:none;color:#fff;background:var(--accent);
+    border-radius:10px;padding:13px 22px;display:none;align-items:center;gap:8px;
+  }
+  a.dl.show{display:inline-flex}
+
+  /* footer notes */
+  .notes{margin-top:34px;padding-top:22px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+  .notes p{margin:0 0 10px}
+  .notes b{color:var(--ink);font-weight:600}
+  .notes a{color:var(--accent)}
+  .privacy{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;color:var(--ok);margin-bottom:14px}
+  .privacy .dot{background:var(--ok)}
+
+  @media (prefers-reduced-motion:reduce){.ch,button.go{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">ISO 19005 · клиентская обработка</p>
+  <h1>PDF/A&nbsp;3A <span class="arrow">→</span> 1A</h1>
+  <p class="lead">Перелейбл, а не пересборка. Меняются <b>два байтовых участка</b> — версия в заголовке и <span style="font-family:var(--mono)">pdfaid:part</span> в XMP. Шрифты, теги, OutputIntent и сам контент остаются нетронутыми, xref-смещения не сдвигаются.</p>
+
+  <label class="card drop" id="drop" tabindex="0" role="button" aria-label="Выбрать PDF-файл">
+    <div class="ico">[ PDF ]</div>
+    <div class="big">Перетащи PDF сюда</div>
+    <div class="sub">или нажми, чтобы выбрать · файл никуда не отправляется</div>
+    <input type="file" id="file" accept="application/pdf,.pdf">
+  </label>
+
+  <section class="card panel" id="panel">
+    <h2 id="fname">осмотр файла</h2>
+    <div id="rows"></div>
+  </section>
+
+  <div class="verdict" id="verdict"></div>
+
+  <div class="card diff" id="diff">
+    <div class="dh">что меняется — побайтово</div>
+    <div class="line"><span class="tag">header</span><span class="old">%PDF-1.<span id="ov">7</span></span><span>→</span><span class="new">%PDF-1.<span class="ch" id="nv">4</span></span></div>
+    <div class="line"><span class="tag">XMP</span><span class="old">&lt;pdfaid:part&gt;<span id="op">3</span>&lt;/pdfaid:part&gt;</span><span>→</span><span class="new">&lt;pdfaid:part&gt;<span class="ch" id="np">1</span>&lt;/pdfaid:part&gt;</span></div>
+  </div>
+
+  <div class="actions">
+    <button class="go" id="go" disabled>Сконвертировать в 1A</button>
+    <a class="dl" id="dl" download>↓ Скачать результат</a>
+  </div>
+
+  <div class="notes">
+    <span class="privacy"><span class="dot"></span>обработка целиком в браузере</span>
+    <p><b>Когда это работает.</b> Инструмент рассчитан на PDF/A-3, которые уже структурно совместимы с PDF/A-1 — как документы из 1С: без вложений, прозрачности и object/xref-стримов. Такие файлы отличаются от 1A по сути только меткой.</p>
+    <p><b>Когда отказывает.</b> Если внутри есть вложенный файл (УПД/счёт-фактура с XML), object-стримы или прозрачность — простой перелейбл дал бы невалидный PDF/A-1. В этих случаях нужна настоящая пересборка (Ghostscript / qpdf), и инструмент честно остановится.</p>
+    <p><b>Проверка.</b> Перед сдачей в архив прогони результат бесплатным валидатором <a href="https://verapdf.org/" target="_blank" rel="noopener">veraPDF</a> (<span style="font-family:var(--mono)">verapdf --flavour 1a файл.pdf</span>).</p>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const drop=$('#drop'),fileInput=$('#file'),panel=$('#panel'),rows=$('#rows'),
+      verdict=$('#verdict'),diff=$('#diff'),go=$('#go'),dl=$('#dl'),fname=$('#fname');
+let state=null; // {bytes, latin, info, name}
+
+// ---- helpers ----
+function toLatin1(bytes){
+  const CH=0x8000;let parts=[];
+  for(let i=0;i<bytes.length;i+=CH) parts.push(String.fromCharCode.apply(null,bytes.subarray(i,i+CH)));
+  return parts.join('');
+}
+function fromLatin1(str){
+  const a=new Uint8Array(str.length);
+  for(let i=0;i<str.length;i++) a[i]=str.charCodeAt(i)&0xff;
+  return a;
+}
+function inspect(s){
+  const h=s.slice(0,1024).match(/%PDF-(\d)\.(\d)/);
+  const p=s.match(/<pdfaid:part>\s*(\d+)\s*<\/pdfaid:part>/);
+  const c=s.match(/<pdfaid:conformance>\s*([A-Za-z]+)\s*<\/pdfaid:conformance>/);
+  return {
+    isPdf:!!h,
+    version:h?h[1]+'.'+h[2]:null,
+    part:p?p[1]:null,
+    conformance:c?c[1].toUpperCase():null,
+    objStm:s.includes('/ObjStm'),
+    xrefStm:/\/Type\s*\/XRef/.test(s),
+    embedded:s.includes('/EmbeddedFiles')||s.includes('/AFRelationship')||/\/Type\s*\/Filespec/.test(s),
+    transparency:s.includes('/Transparency')||s.includes('/SMask'),
+    tagged:s.includes('/StructTreeRoot')&&/\/Marked\s+true/.test(s),
+  };
+}
+function row(k,v,status){
+  const d=status?`<span class="dot ${status}"></span>`:'';
+  return `<div class="row"><span class="k">${k}</span><span class="v">${d}${v}</span></div>`;
+}
+
+// ---- file intake ----
+function handle(file){
+  if(!file) return;
+  state={name:file.name};
+  const r=new FileReader();
+  r.onload=()=>{
+    const bytes=new Uint8Array(r.result);
+    const latin=toLatin1(bytes);
+    const info=inspect(latin);
+    state.bytes=bytes;state.latin=latin;state.info=info;
+    render(file.name,info);
+  };
+  r.readAsArrayBuffer(file);
+}
+fileInput.addEventListener('change',e=>handle(e.target.files[0]));
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fileInput.click();}});
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]);});
+
+// ---- render inspection + verdict ----
+function render(name,info){
+  fname.textContent=name;
+  let html='';
+  if(!info.isPdf){
+    html=row('файл','не PDF','err');
+    rows.innerHTML=html;panel.classList.add('show');
+    setVerdict('err','<b>Это не PDF.</b> Выбери PDF-документ.');return;
+  }
+  const fmt = info.part ? `PDF/A-${info.part}${info.conformance||''}` : 'обычный PDF (не PDF/A)';
+  html+=row('текущий формат',fmt,info.part?'ok':'warn');
+  html+=row('версия PDF',info.version,info.version==='1.4'?'ok':'warn');
+  html+=row('теги (StructTree)',info.tagged?'есть':'нет',info.tagged?'ok':'warn');
+  html+=row('object/xref-стримы',(info.objStm||info.xrefStm)?'есть':'нет',(info.objStm||info.xrefStm)?'err':'ok');
+  html+=row('вложенные файлы',info.embedded?'есть':'нет',info.embedded?'err':'ok');
+  html+=row('прозрачность',info.transparency?'есть':'нет',info.transparency?'err':'ok');
+  rows.innerHTML=html;panel.classList.add('show');
+  decide(info);
+}
+
+function decide(info){
+  diff.classList.remove('show');dl.classList.remove('show');go.disabled=true;
+  if(!info.part){
+    setVerdict('err','<b>Это не PDF/A.</b> Перелейбл бесполезен — здесь нет метки <span style="font-family:var(--mono)">pdfaid</span>, которую можно поправить. Нужна полноценная конвертация (Ghostscript).');return;
+  }
+  if(info.conformance==='U'){
+    setVerdict('err','<b>Уровень U не существует в PDF/A-1.</b> Файл можно понизить только до 1B через пересборку, простой перелейбл не подойдёт.');return;
+  }
+  if(info.objStm||info.xrefStm){
+    setVerdict('err','<b>Внутри object/xref-стримы.</b> PDF/A-1 их запрещает, и байтовый патч это не исправит. Нужен <span style="font-family:var(--mono)">qpdf --object-streams=disable</span> или Ghostscript.');return;
+  }
+  if(info.embedded){
+    setVerdict('err','<b>Есть вложенные файлы.</b> В PDF/A-1 вложения запрещены, а их удаление = потеря данных. Делать это осознанно — питон-скриптом, не здесь.');return;
+  }
+  if(info.transparency){
+    setVerdict('err','<b>Есть прозрачность.</b> PDF/A-1 (PDF 1.4) её не допускает — нужен рендер/флаттенинг через Ghostscript.');return;
+  }
+  if(info.part==='1' && info.version==='1.4'){
+    setVerdict('ok','<b>Уже PDF/A-1.</b> Делать нечего.');return;
+  }
+  // good to go
+  go.disabled=false;
+  $('#ov').textContent=info.version.split('.')[1];
+  $('#op').textContent=info.part;
+  if(!info.tagged && info.conformance!=='B'){
+    $('#np').textContent='1';
+    setVerdict('warn','Файл <b>не тегирован</b>, поэтому уровень A заявлять нельзя — метку поставлю как <b>1B</b> (это валидно). Нажми, чтобы сконвертировать.');
+    state.targetConf='B';
+  }else{
+    setVerdict('ok','Можно перелейблить в <b>PDF/A-1'+(info.conformance||'B')+'</b> без пересборки. Контент не изменится.');
+    state.targetConf=info.conformance||'B';
+  }
+}
+function setVerdict(type,msg){verdict.className='verdict show '+type;verdict.innerHTML=msg;}
+
+// ---- convert ----
+go.addEventListener('click',()=>{
+  const info=state.info;let s=state.latin;
+  s=s.replace(/(%PDF-\d\.)\d/, '$14');                                   // header → 1.4
+  s=s.replace(/(<pdfaid:part>\s*)\d+(\s*<\/pdfaid:part>)/g,'$11$2');      // part → 1
+  if(state.targetConf==='B' && info.conformance!=='B'){
+    if(info.conformance) s=s.replace(/(<pdfaid:conformance>\s*)[A-Za-z]+(\s*<\/pdfaid:conformance>)/g,'$1B$2');
+  }
+  const out=fromLatin1(s);
+  const blob=new Blob([out],{type:'application/pdf'});
+  const base=state.name.replace(/\.pdf$/i,'');
+  dl.href=URL.createObjectURL(blob);
+  dl.download=base+'_PDFA-1'+state.targetConf+'.pdf';
+  dl.classList.add('show');
+  diff.classList.add('show');
+  // animate the changed digits
+  requestAnimationFrame(()=>{[$('#nv'),$('#np')].forEach(el=>{el.style.transform='translateY(-3px)';setTimeout(()=>el.style.transform='none',180);});});
+  setVerdict('ok','<b>Готово.</b> Скачай файл справа и прогони через veraPDF для финальной проверки.');
+  go.disabled=true;
+});
+</script>
+</body>
+</html>
